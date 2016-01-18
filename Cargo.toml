@@ -11,8 +11,7 @@ version = "0.1.0"
 authors = ["paul@colomiets.name"]
 
 [dependencies]
-mio = "0.5"
-rotor = "0.4.0"
+rotor = { rev="6ae0b55", git="git://github.com/tailhook/rotor" }
 time = "0.1.34"
 quick-error = "0.2.1"
 dns-parser = "0.1.0"
