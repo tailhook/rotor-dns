@@ -1,10 +1,15 @@
 extern crate rotor;
 extern crate time;
 extern crate dns_parser;
+#[macro_use] extern crate quick_error;
+
+mod serialize;
+mod error;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
+pub use error::Error;
 pub use dns_parser::QueryType;
 type Id = u16;
 
@@ -21,7 +26,7 @@ pub enum Response {
 }
 
 struct Request {
-    id:
+    id: Id,
     timeout: rotor::Timeout,
 }
 
@@ -35,3 +40,4 @@ struct DnsMachine {
     queued: HashMap<Query, Id>,
     cache: HashMap<Query, Arc<CacheEntry>>,
 }
+
