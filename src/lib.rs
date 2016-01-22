@@ -8,8 +8,10 @@ extern crate resolv_conf;
 mod serialize;
 mod error;
 mod config;
+mod fsm;
 
 use std::io;
+use std::marker::PhantomData;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -37,6 +39,7 @@ pub enum Response {
 struct Request {
     id: Id,
     timeout: rotor::Timeout,
+    notifiers: Vec<Arc<Mutex<Option<Arc<CacheEntry>>>>>,
 }
 
 pub struct CacheEntry {
@@ -52,11 +55,15 @@ struct DnsMachine {
     sock: UdpSocket,
 }
 
-pub struct Fsm(Arc<Mutex<DnsMachine>>);
+pub struct Future {
+    value: Option<Arc<CacheEntry>>,
+}
+
+pub struct Fsm<C>(Arc<Mutex<DnsMachine>>, PhantomData<*const C>);
 pub struct Resolver(Arc<Mutex<DnsMachine>>);
 
-pub fn create_resolver(scope: &mut EarlyScope, config: Config)
-    -> Result<(Resolver, Fsm), io::Error>
+pub fn create_resolver<C>(scope: &mut EarlyScope, config: Config)
+    -> Result<(Resolver, Fsm<C>), io::Error>
 {
     let machine = DnsMachine {
         config: config,
@@ -69,5 +76,5 @@ pub fn create_resolver(scope: &mut EarlyScope, config: Config)
     try!(scope.register(&machine.sock,
         EventSet::readable(), PollOpt::level()));
     let arc = Arc::new(Mutex::new(machine));
-    Ok((Resolver(arc.clone()), Fsm(arc.clone())))
+    Ok((Resolver(arc.clone()), Fsm(arc.clone(), PhantomData)))
 }
