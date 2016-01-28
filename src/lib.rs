@@ -1,6 +1,7 @@
 extern crate ip;
 extern crate rotor;
 extern crate time;
+extern crate rand;
 extern crate dns_parser;
 extern crate resolv_conf;
 #[macro_use] extern crate quick_error;
@@ -9,6 +10,7 @@ mod serialize;
 mod error;
 mod config;
 mod fsm;
+mod resolver;
 
 use std::io;
 use std::marker::PhantomData;
@@ -16,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-use rotor::{EarlyScope, PollOpt, EventSet};
+use rotor::{EarlyScope, PollOpt, EventSet, Notifier};
 use rotor::mio::udp::UdpSocket;
 
 pub use config::Config;
@@ -38,8 +40,9 @@ pub enum Response {
 
 struct Request {
     id: Id,
-    timeout: rotor::Timeout,
-    notifiers: Vec<Arc<Mutex<Option<Arc<CacheEntry>>>>>,
+    query: Query,
+    deadline: time::SteadyTime,
+    notifiers: Vec<(Arc<Mutex<Option<Arc<CacheEntry>>>>, Notifier)>,
 }
 
 pub struct CacheEntry {

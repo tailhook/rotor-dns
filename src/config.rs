@@ -4,6 +4,7 @@ use std::fs::File;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
+use time::Duration;
 use ip::SocketAddrExt;
 use resolv_conf::{Config as Resolv};
 
@@ -25,7 +26,8 @@ quick_error! {
 
 
 pub struct Config {
-    nameservers: Vec<SocketAddr>,
+    pub nameservers: Vec<SocketAddr>,
+    pub timeout: Duration,
 }
 
 
@@ -41,6 +43,7 @@ impl Config {
             nameservers: cfg.nameservers.iter()
                 .map(|ns| <SocketAddr as SocketAddrExt>::new(*ns, 53))
                 .collect(),
+            timeout: Duration::seconds(cfg.timeout.into()),
         })
     }
 }
