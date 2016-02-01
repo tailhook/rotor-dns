@@ -5,6 +5,7 @@ Rotor DNS
 A pure-rust asynchronous domain name system resolver library.
 
 :Status: Pre-alpha
+:Documentation: http://tailhook.github.com/rotor-dns/
 
 The library based on `resolv-conf`_ and `dns-parser`_ and mostly provides only
 asynchronous layer on top of `rotor`_.
