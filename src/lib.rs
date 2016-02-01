@@ -2,11 +2,11 @@ extern crate ip;
 extern crate rotor;
 extern crate time;
 extern crate rand;
+extern crate void;
 extern crate dns_parser;
 extern crate resolv_conf;
 #[macro_use] extern crate quick_error;
 
-mod serialize;
 mod error;
 mod config;
 mod fsm;
@@ -43,7 +43,7 @@ struct Request {
     id: Id,
     query: Query,
     server: SocketAddr,
-    deadline: time::SteadyTime,
+    // deadline: time::SteadyTime, TODO(tailhook) implement deadlines
     notifiers: Vec<(Arc<Mutex<Option<Arc<CacheEntry>>>>, Notifier)>,
 }
 
@@ -56,7 +56,7 @@ pub struct CacheEntry {
 struct DnsMachine {
     config: Config,
     running: HashMap<Id, Request>,
-    queued: HashMap<Query, Id>,
+    // ueued: HashMap<Query, Id>,  TODO(tailhook) implement duplicate checking
     cache: HashMap<Query, Arc<CacheEntry>>,
     sock: UdpSocket,
 }
@@ -70,7 +70,8 @@ pub fn create_resolver<C>(scope: &mut EarlyScope, config: Config)
     let machine = DnsMachine {
         config: config,
         running: HashMap::new(),
-        queued: HashMap::new(),
+        // TODO(tailhook) implement duplicate checking
+        // queued: HashMap::new(),
         cache: HashMap::new(),
         sock: try!(UdpSocket::bound(&SocketAddr::V4(
             SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)))),

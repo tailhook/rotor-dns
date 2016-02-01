@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::io::ErrorKind::Interrupted;
 use std::error::Error;
 
+use void::{unreachable, Void};
 use time::{SteadyTime, Duration};
 use dns_parser::{Packet, QueryType, QueryClass, RRData};
 use rotor::{Machine, EventSet, Scope, Response};
@@ -33,12 +34,12 @@ impl Request {
 
 
 impl<C> Machine for Fsm<C> {
-    type Seed = (); // Actually void
+    type Seed = Void; // Actually void
     type Context = C;
-    fn create(seed: Self::Seed, scope: &mut Scope<Self::Context>)
+    fn create(seed: Self::Seed, _scope: &mut Scope<Self::Context>)
         -> Result<Self, Box<Error>>
-    { unreachable!(); }
-    fn ready(self, events: EventSet, scope: &mut Scope<Self::Context>)
+    { unreachable(seed); }
+    fn ready(self, _events: EventSet, _scope: &mut Scope<Self::Context>)
         -> Response<Self, Self::Seed>
     {
         {
@@ -108,13 +109,13 @@ impl<C> Machine for Fsm<C> {
         }
         Response::ok(self)
     }
-    fn spawned(self, scope: &mut Scope<Self::Context>)
+    fn spawned(self, _scope: &mut Scope<Self::Context>)
         -> Response<Self, Self::Seed>
     { unreachable!(); }
-    fn timeout(self, scope: &mut Scope<Self::Context>)
+    fn timeout(self, _scope: &mut Scope<Self::Context>)
         -> Response<Self, Self::Seed>
-    { unreachable!(); }
-    fn wakeup(self, scope: &mut Scope<Self::Context>)
+    { Response::ok(self) }
+    fn wakeup(self, _scope: &mut Scope<Self::Context>)
         -> Response<Self, Self::Seed>
-    { unimplemented!(); }
+    { Response::ok(self) }
 }

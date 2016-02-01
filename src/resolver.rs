@@ -2,7 +2,7 @@ use std::io;
 use std::sync::{Arc, Mutex};
 
 use rand::{thread_rng, Rng};
-use time::{SteadyTime, Duration};
+use time::{SteadyTime};
 use rotor::GenericScope;
 use dns_parser::{Builder, QueryType, QueryClass};
 
@@ -73,7 +73,8 @@ impl Resolver {
             id: id,
             query: query,
             server: server,
-            deadline: SteadyTime::now() + res.config.timeout,
+            // TODO(tailhook) implement deadline checking
+            // deadline: SteadyTime::now() + res.config.timeout,
             notifiers: vec![(result.clone(), scope.notifier())],
         });
         Ok(result)
