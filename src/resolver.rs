@@ -1,3 +1,4 @@
+use std::io;
 use std::sync::{Arc, Mutex};
 
 use rand::{thread_rng, Rng};
@@ -20,6 +21,12 @@ quick_error! {
         /// Should not happen in practice
         TruncatedPacket {
             description("query results in packet truncation")
+        }
+        Net(err: io::Error) {
+            description(err.description())
+            display("{}", err)
+            cause(err)
+            from()
         }
     }
 }
@@ -49,18 +56,23 @@ impl Resolver {
         }
         let mut builder = Builder::new_query(id, true);
         match query {
-            Query::LookupHost(ref q) => {
+            Query::LookupIpv4(ref q) => {
                 builder.add_question(q, QueryType::A, QueryClass::IN);
             }
         }
         let pack = try!(builder.build()
             .map_err(|_| QueryError::TruncatedPacket));
 
-        // TODO(tailhook) send packet
+        // TODO(tailhook) better server selection algo
+        let server = res.config.nameservers[0];
+
+        try!(res.sock.send_to(&pack, &server));
+
         let result = Arc::new(Mutex::new(None));
         res.running.insert(id, Request {
             id: id,
             query: query,
+            server: server,
             deadline: SteadyTime::now() + res.config.timeout,
             notifiers: vec![(result.clone(), scope.notifier())],
         });

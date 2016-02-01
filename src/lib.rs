@@ -31,22 +31,25 @@ type Id = u16;
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Query {
     /// Simple host lookup (A record)
-    LookupHost(String),
+    LookupIpv4(String),
 }
 
-pub enum Response {
-    LookupResponse(Vec<String>),
+#[derive(Debug)]
+pub enum Answer {
+    Ipv4(Vec<Ipv4Addr>),
 }
 
 struct Request {
     id: Id,
     query: Query,
+    server: SocketAddr,
     deadline: time::SteadyTime,
     notifiers: Vec<(Arc<Mutex<Option<Arc<CacheEntry>>>>, Notifier)>,
 }
 
+#[derive(Debug)]
 pub struct CacheEntry {
-    pub value: Response,
+    pub value: Answer,
     pub expire: time::SteadyTime,
 }
 
@@ -56,10 +59,6 @@ struct DnsMachine {
     queued: HashMap<Query, Id>,
     cache: HashMap<Query, Arc<CacheEntry>>,
     sock: UdpSocket,
-}
-
-pub struct Future {
-    value: Option<Arc<CacheEntry>>,
 }
 
 pub struct Fsm<C>(Arc<Mutex<DnsMachine>>, PhantomData<*const C>);
