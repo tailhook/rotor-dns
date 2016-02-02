@@ -44,8 +44,8 @@ impl<C> Machine for Fsm<C> {
     {
         {
             let mut res = self.0.lock().unwrap();
-            let mut buf = vec![0u8; 4096];
             loop {
+                let mut buf = [0u8; 4096];
                 let (bytes, addr) = match res.sock.recv_from(&mut buf) {
                     Ok(Some((bytes, addr))) => (bytes, addr),
                     Ok(None) => break,
