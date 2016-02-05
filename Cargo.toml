@@ -8,7 +8,7 @@ readme = "README.rst"
 keywords = ["rotor", "DNS", "domain", "name", "async"]
 homepage = "http://github.com/tailhook/rotor-dns"
 documentation = "http://tailhook.github.com/rotor-dns/"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["paul@colomiets.name"]
 
 [dependencies]
