@@ -7,24 +7,27 @@ extern crate dns_parser;
 extern crate resolv_conf;
 #[macro_use] extern crate quick_error;
 
-mod error;
 mod config;
 mod fsm;
 mod resolver;
+mod time_util;
 
 use std::io;
 use std::marker::PhantomData;
-use std::collections::HashMap;
+use std::collections::{HashMap, BinaryHeap};
 use std::sync::{Arc, Mutex};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-use rotor::{EarlyScope, PollOpt, EventSet, Notifier};
+use rotor::{EarlyScope, PollOpt, EventSet, Notifier, Timeout};
 use rotor::mio::udp::UdpSocket;
 
 pub use config::Config;
-pub use error::Error;
+pub use resolver::QueryError;
 pub use dns_parser::QueryType;
+
 type Id = u16;
+#[derive(Debug)]
+struct TimeEntry(time::SteadyTime, Id);
 
 
 /// Human friendly query types
@@ -36,14 +39,17 @@ pub enum Query {
 
 #[derive(Debug)]
 pub enum Answer {
+    ServerUnavailable,
     Ipv4(Vec<Ipv4Addr>),
 }
 
 struct Request {
     id: Id,
     query: Query,
+    nameserver_index: usize,
+    attempts: u32,
     server: SocketAddr,
-    // deadline: time::SteadyTime, TODO(tailhook) implement deadlines
+    deadline: time::SteadyTime,
     notifiers: Vec<(Arc<Mutex<Option<Arc<CacheEntry>>>>, Notifier)>,
 }
 
@@ -56,9 +62,11 @@ pub struct CacheEntry {
 struct DnsMachine {
     config: Config,
     running: HashMap<Id, Request>,
-    // ueued: HashMap<Query, Id>,  TODO(tailhook) implement duplicate checking
     cache: HashMap<Query, Arc<CacheEntry>>,
     sock: UdpSocket,
+    timeouts: BinaryHeap<TimeEntry>,
+    timeout: Option<Timeout>,
+    notifier: Notifier,
 }
 
 pub struct Fsm<C>(Arc<Mutex<DnsMachine>>, PhantomData<*const C>);
@@ -75,6 +83,9 @@ pub fn create_resolver<C>(scope: &mut EarlyScope, config: Config)
         cache: HashMap::new(),
         sock: try!(UdpSocket::bound(&SocketAddr::V4(
             SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)))),
+        timeouts: BinaryHeap::new(),
+        timeout: None,
+        notifier: scope.notifier(),
     };
     try!(scope.register(&machine.sock,
         EventSet::readable(), PollOpt::level()));

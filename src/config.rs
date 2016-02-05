@@ -28,6 +28,7 @@ quick_error! {
 pub struct Config {
     pub nameservers: Vec<SocketAddr>,
     pub timeout: Duration,
+    pub attempts: u32,
 }
 
 
@@ -44,6 +45,7 @@ impl Config {
                 .map(|ns| <SocketAddr as SocketAddrExt>::new(*ns, 53))
                 .collect(),
             timeout: Duration::seconds(cfg.timeout.into()),
+            attempts: 2, // cfg.attempts.into(),
         })
     }
 }

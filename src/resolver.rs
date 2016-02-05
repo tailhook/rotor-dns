@@ -1,13 +1,10 @@
 use std::io;
 use std::sync::{Arc, Mutex};
 
-use rand::{thread_rng, Rng};
 use time::{SteadyTime};
 use rotor::GenericScope;
-use dns_parser::{Builder, QueryType, QueryClass};
 
-use {Query, Resolver, CacheEntry, Request};
-
+use {Query, Resolver, CacheEntry, Request, TimeEntry};
 
 quick_error! {
     /// Error when creating a query
@@ -31,8 +28,6 @@ quick_error! {
     }
 }
 
-
-
 impl Resolver {
     pub fn query<S>(&self, query: Query, scope: &mut GenericScope)
         -> Result<Arc<Mutex<Option<Arc<CacheEntry>>>>, QueryError>
@@ -43,40 +38,29 @@ impl Resolver {
             if SteadyTime::now() > cache.expire {
                 res.cache.remove(&query);
             } else {
-                // TODO(tailhook) wakeup now
-                unimplemented!();
+                // TODO(tailhook) should we trade off possible bugs for
+                //                performance?
+                scope.notifier().wakeup().unwrap();
+                return Ok(Arc::new(Mutex::new(Some(cache.clone()))));
             }
         }
-        // TODO(tailhook) limit number of retries somehow
-        // Note: we don't use counter here, because this allows us to be
-        // a little more resistant to DNS spoofing
-        let mut id = thread_rng().gen();
-        while res.running.contains_key(&id) {
-            id = thread_rng().gen();
-        }
-        let mut builder = Builder::new_query(id, true);
-        match query {
-            Query::LookupIpv4(ref q) => {
-                builder.add_question(q, QueryType::A, QueryClass::IN);
-            }
-        }
-        let pack = try!(builder.build()
-            .map_err(|_| QueryError::TruncatedPacket));
-
-        // TODO(tailhook) better server selection algo
-        let server = res.config.nameservers[0];
-
-        try!(res.sock.send_to(&pack, &server));
+        // TODO(tailhook) implement round-robin/random server selection
+        let server = 0;
+        let id = try!(res.send_request(&query, server));
 
         let result = Arc::new(Mutex::new(None));
+        let deadline = SteadyTime::now() + res.config.timeout;
         res.running.insert(id, Request {
             id: id,
             query: query,
-            server: server,
-            // TODO(tailhook) implement deadline checking
-            // deadline: SteadyTime::now() + res.config.timeout,
+            nameserver_index: server,
+            attempts: 1,
+            server: res.config.nameservers[server],
+            deadline: deadline,
             notifiers: vec![(result.clone(), scope.notifier())],
         });
+        res.timeouts.push(TimeEntry(deadline, id));
+        res.notifier.wakeup().unwrap();  // to schedule a timeout
         Ok(result)
     }
 }

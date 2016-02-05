@@ -2,11 +2,14 @@
 extern crate rotor_dns;
 extern crate argparse;
 extern crate void;
+extern crate time;
 
 use std::error::Error;
+use std::process::exit;
 
+use time::Duration;
 use void::{Void, unreachable};
-use argparse::{ArgumentParser, Store};
+use argparse::{ArgumentParser, Store, List, ParseOption};
 use rotor::{Machine, EventSet, Scope, Response};
 use rotor_dns::{CacheEntry, Query, Answer};
 
@@ -44,20 +47,36 @@ impl Machine for Shutter {
 
 fn main() {
     let mut host = "".to_string();
+    let mut servers = vec![];
+    let mut timeout = None;
+    let mut attempts = None;
     {
         let mut ap = ArgumentParser::new();
         ap.set_description("
             Host-like comand to resolve the host
             ");
+        ap.refer(&mut servers).add_option(&["--servers"], List, "
+            Override servers to use for name resolving (Note, it's useless to
+            set number of servers more than attepmpts).")
+            .metavar("HOST:PORT");
+        ap.refer(&mut attempts).add_option(&["--attempts"], ParseOption, "
+            Override number of attempts");
+        ap.refer(&mut timeout).add_option(&["--timeout-ms"], ParseOption, "
+            Override the network timeout. In milliseconds.");
         ap.refer(&mut host).add_argument("name", Store, "
             Hostname to resolve");
         ap.parse_args_or_exit();
     }
     let mut loop_creator = rotor::Loop::new(&rotor::Config::new()).unwrap();
     let mut resolver = None;
+    let mut cfg = rotor_dns::Config::system().unwrap();
+    if servers.len() > 0 {
+        cfg.nameservers = servers;
+    }
+    attempts.map(|x| cfg.attempts = x);
+    timeout.map(|x| cfg.timeout = Duration::milliseconds(x));
     loop_creator.add_machine_with(|scope| {
-        let (res, fsm) = rotor_dns::create_resolver(
-            scope, rotor_dns::Config::system().unwrap()).unwrap();
+        let (res, fsm) = rotor_dns::create_resolver(scope, cfg).unwrap();
         resolver = Some(res);
         Ok(Composed::Dns(fsm))
     }).unwrap();
@@ -77,5 +96,8 @@ fn main() {
         for ip in ips {
             println!("{}", ip);
         }
+        exit(0);
+    } else {
+        exit(1);
     }
 }
