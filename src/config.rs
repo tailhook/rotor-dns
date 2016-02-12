@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use time::Duration;
 use ip::SocketAddrExt;
-use resolv_conf::{Config as Resolv};
+use resolv_conf;
 
 
 quick_error! {
@@ -17,7 +17,7 @@ quick_error! {
             display("Error reading {:?}: {}", path, err)
             cause(err)
         }
-        ResolvConf(err: u32 /*crappy resolv-conf*/) {
+        ResolvConf(err: resolv_conf::ParseError) {
             description("Error parsing resolv.conf")
             from()
         }
@@ -39,13 +39,13 @@ impl Config {
         try!(File::open("/etc/resolv.conf")
             .and_then(|mut f| f.read_to_end(&mut buf))
             .map_err(|e| FileError("/etc/resolv.conf".into(), e)));
-        let cfg = try!(Resolv::parse(&buf));
+        let cfg = try!(resolv_conf::Config::parse(&buf));
         Ok(Config {
             nameservers: cfg.nameservers.iter()
                 .map(|ns| <SocketAddr as SocketAddrExt>::new(*ns, 53))
                 .collect(),
             timeout: Duration::seconds(cfg.timeout.into()),
-            attempts: 2, // cfg.attempts.into(),
+            attempts: cfg.attempts.into(),
         })
     }
 }
