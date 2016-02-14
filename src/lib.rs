@@ -5,7 +5,6 @@ extern crate rand;
 extern crate void;
 extern crate dns_parser;
 extern crate resolv_conf;
-extern crate abstract_ns;
 #[macro_use] extern crate quick_error;
 
 mod config;
