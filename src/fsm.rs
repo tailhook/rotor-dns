@@ -11,7 +11,7 @@ use dns_parser::{Packet, QueryType, QueryClass, RRData, Builder};
 use rotor::{Machine, EventSet, Scope, Response};
 
 use {Fsm, Request, Query, Answer, CacheEntry, DnsMachine, Id, QueryError};
-use {TimeEntry};
+use {TimeEntry, MxRecord, SrvRecord};
 
 impl Request {
     pub fn matches(&self, pack: &Packet) -> bool {
@@ -22,6 +22,24 @@ impl Request {
         match self.query {
             Query::LookupIpv4(ref host) => {
                 if q.qtype != QueryType::A || q.qclass != QueryClass::IN {
+                    return false;
+                }
+                // TODO(tailhook) optimize the comparison
+                if &format!("{}", q.qname) != host {
+                    return false;
+                }
+            }
+            Query::LookupSrv(ref host) => {
+                if q.qtype != QueryType::SRV || q.qclass != QueryClass::IN {
+                    return false;
+                }
+                // TODO(tailhook) optimize the comparison
+                if &format!("{}", q.qname) != host {
+                    return false;
+                }
+            }
+            Query::LookupMx(ref host) => {
+                if q.qtype != QueryType::MX || q.qclass != QueryClass::IN {
                     return false;
                 }
                 // TODO(tailhook) optimize the comparison
@@ -132,6 +150,44 @@ impl DnsMachine {
                     }
                     Answer::Ipv4(ips)
                 }
+                Query::LookupMx(_) => {
+                    let mut rows = Vec::with_capacity(pack.answers.len());
+                    for ans in pack.answers {
+                        ttl = min(ttl, ans.ttl);
+                        match ans.data {
+                            RRData::MX { preference, exchange } => {
+                                rows.push(MxRecord {
+                                    preference: preference,
+                                    exchange: exchange.to_string(),
+                                });
+                            }
+                            _ => {
+                                // Bad value. Log it?
+                            }
+                        }
+                    }
+                    Answer::Mx(rows)
+                }
+                Query::LookupSrv(_) => {
+                    let mut rows = Vec::with_capacity(pack.answers.len());
+                    for ans in pack.answers {
+                        ttl = min(ttl, ans.ttl);
+                        match ans.data {
+                            RRData::SRV { priority, weight, port, target } => {
+                                rows.push(SrvRecord {
+                                    priority: priority,
+                                    weight: weight,
+                                    port: port,
+                                    target: target.to_string(),
+                                });
+                            }
+                            _ => {
+                                // Bad value. Log it?
+                            }
+                        }
+                    }
+                    Answer::Srv(rows)
+                }
             };
             let entry = CacheEntry {
                 value: result,
@@ -160,6 +216,12 @@ impl DnsMachine {
         match query {
             &Query::LookupIpv4(ref q) => {
                 builder.add_question(q, QueryType::A, QueryClass::IN);
+            }
+            &Query::LookupMx(ref q) => {
+                builder.add_question(q, QueryType::MX, QueryClass::IN);
+            }
+            &Query::LookupSrv(ref q) => {
+                builder.add_question(q, QueryType::SRV, QueryClass::IN);
             }
         }
         let pack = try!(builder.build()

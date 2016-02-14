@@ -5,6 +5,7 @@ extern crate rand;
 extern crate void;
 extern crate dns_parser;
 extern crate resolv_conf;
+extern crate abstract_ns;
 #[macro_use] extern crate quick_error;
 
 mod config;
@@ -35,12 +36,35 @@ struct TimeEntry(time::SteadyTime, Id);
 pub enum Query {
     /// Simple host lookup (A record)
     LookupIpv4(String),
+    /// Plain SRV record lookup
+    LookupSrv(String),
+    /// Plain MX record lookup
+    LookupMx(String),
 }
 
+/// A generic DNS answer
 #[derive(Debug)]
 pub enum Answer {
     ServerUnavailable,
     Ipv4(Vec<Ipv4Addr>),
+    Srv(Vec<SrvRecord>),
+    Mx(Vec<MxRecord>),
+}
+
+/// Single SRV record
+#[derive(Debug, Clone)]
+pub struct SrvRecord {
+    pub priority: u16,
+    pub weight: u16,
+    pub port: u16,
+    pub target: String,
+}
+
+/// Single MX record
+#[derive(Debug, Clone)]
+pub struct MxRecord {
+    pub preference: u16,
+    pub exchange: String,
 }
 
 struct Request {
@@ -73,7 +97,7 @@ pub struct Fsm<C>(Arc<Mutex<DnsMachine>>, PhantomData<*const C>);
 pub struct Resolver(Arc<Mutex<DnsMachine>>);
 
 pub fn create_resolver<C>(scope: &mut EarlyScope, config: Config)
-    -> Result<(Resolver, Fsm<C>), io::Error>
+    -> Result<(Fsm<C>, Resolver), io::Error>
 {
     let machine = DnsMachine {
         config: config,
@@ -90,5 +114,5 @@ pub fn create_resolver<C>(scope: &mut EarlyScope, config: Config)
     try!(scope.register(&machine.sock,
         EventSet::readable(), PollOpt::level()));
     let arc = Arc::new(Mutex::new(machine));
-    Ok((Resolver(arc.clone()), Fsm(arc.clone(), PhantomData)))
+    Ok((Fsm(arc.clone(), PhantomData), Resolver(arc.clone())))
 }

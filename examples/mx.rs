@@ -1,16 +1,13 @@
 #[macro_use] extern crate rotor;
 extern crate rotor_dns;
 extern crate rotor_tools;
-extern crate argparse;
 extern crate void;
 extern crate time;
 
 use std::error::Error;
 use std::process::exit;
 
-use time::Duration;
 use void::{Void, unreachable};
-use argparse::{ArgumentParser, Store, List, ParseOption};
 use rotor::{Machine, EventSet, Scope, Response};
 use rotor_dns::{CacheEntry, Query, Answer};
 use rotor_tools::loop_ext::{LoopExt};
@@ -48,34 +45,9 @@ impl Machine for Shutter {
 
 
 fn main() {
-    let mut host = "".to_string();
-    let mut servers = vec![];
-    let mut timeout = None;
-    let mut attempts = None;
-    {
-        let mut ap = ArgumentParser::new();
-        ap.set_description("
-            Host-like comand to resolve the host
-            ");
-        ap.refer(&mut servers).add_option(&["--servers"], List, "
-            Override servers to use for name resolving (Note, it's useless to
-            set number of servers more than attepmpts).")
-            .metavar("HOST:PORT");
-        ap.refer(&mut attempts).add_option(&["--attempts"], ParseOption, "
-            Override number of attempts");
-        ap.refer(&mut timeout).add_option(&["--timeout-ms"], ParseOption, "
-            Override the network timeout. In milliseconds.");
-        ap.refer(&mut host).add_argument("name", Store, "
-            Hostname to resolve");
-        ap.parse_args_or_exit();
-    }
+    let host = "gmail.com".to_string();
     let mut loop_creator = rotor::Loop::new(&rotor::Config::new()).unwrap();
-    let mut cfg = rotor_dns::Config::system().unwrap();
-    if servers.len() > 0 {
-        cfg.nameservers = servers;
-    }
-    attempts.map(|x| cfg.attempts = x);
-    timeout.map(|x| cfg.timeout = Duration::milliseconds(x));
+    let cfg = rotor_dns::Config::system().unwrap();
     let resolver = loop_creator.add_and_fetch(Composed::Dns, |scope| {
         rotor_dns::create_resolver(scope, cfg)
     }).unwrap();
@@ -83,16 +55,16 @@ fn main() {
     let mut query = None;
     loop_inst.add_machine_with(|scope| {
         query = Some(resolver.query::<Scope<Context>>(
-            Query::LookupIpv4(host), scope).unwrap());
+            Query::LookupMx(host), scope).unwrap());
         Ok(Composed::Shut(Shutter))
     }).unwrap();
     loop_inst.run().unwrap();
     let qb = query.unwrap();
     let query = qb.lock().unwrap();
     let entry = query.as_ref().map(|x| &**x);
-    if let Some(&CacheEntry { value: Answer::Ipv4(ref ips), .. }) = entry {
-        for ip in ips {
-            println!("{}", ip);
+    if let Some(&CacheEntry { value: Answer::Mx(ref recs), .. }) = entry {
+        for record in recs {
+            println!("{:5} {}", record.preference, record.exchange);
         }
         exit(0);
     } else {
