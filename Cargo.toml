@@ -14,7 +14,6 @@ authors = ["paul@colomiets.name"]
 [dependencies]
 rand = "0.3.13"
 rotor = {git="git://github.com/tailhook/rotor", rev="71a9f78"}
-time = "0.1.34"
 ip = "1.0.0"
 quick-error = "0.2.2"
 dns-parser = "0.3.0"

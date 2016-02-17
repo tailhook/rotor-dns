@@ -1,6 +1,5 @@
 extern crate ip;
 extern crate rotor;
-extern crate time;
 extern crate rand;
 extern crate dns_parser;
 extern crate resolv_conf;
@@ -16,7 +15,7 @@ use std::collections::{HashMap, BinaryHeap};
 use std::sync::{Arc, Mutex};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-use rotor::{EarlyScope, PollOpt, EventSet, Notifier, Timeout, Response, Void};
+use rotor::{EarlyScope, PollOpt, EventSet, Notifier, Time, Response, Void};
 use rotor::mio::udp::UdpSocket;
 
 pub use config::Config;
@@ -25,7 +24,7 @@ pub use dns_parser::QueryType;
 
 type Id = u16;
 #[derive(Debug)]
-struct TimeEntry(time::SteadyTime, Id);
+struct TimeEntry(Time, Id);
 
 
 /// Human friendly query types
@@ -70,14 +69,14 @@ struct Request {
     nameserver_index: usize,
     attempts: u32,
     server: SocketAddr,
-    deadline: time::SteadyTime,
+    deadline: Time,
     notifiers: Vec<(Arc<Mutex<Option<Arc<CacheEntry>>>>, Notifier)>,
 }
 
 #[derive(Debug)]
 pub struct CacheEntry {
     pub value: Answer,
-    pub expire: time::SteadyTime,
+    pub expire: Time,
 }
 
 struct DnsMachine {
@@ -86,7 +85,6 @@ struct DnsMachine {
     cache: HashMap<Query, Arc<CacheEntry>>,
     sock: UdpSocket,
     timeouts: BinaryHeap<TimeEntry>,
-    timeout: Option<Timeout>,
     notifier: Notifier,
 }
 
@@ -108,7 +106,6 @@ pub fn create_resolver<C>(scope: &mut EarlyScope, config: Config)
             Err(e) => return Response::error(Box::new(e)),
         },
         timeouts: BinaryHeap::new(),
-        timeout: None,
         notifier: scope.notifier(),
     };
     match scope.register(&machine.sock,

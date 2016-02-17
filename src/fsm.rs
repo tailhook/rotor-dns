@@ -2,12 +2,12 @@ use std::i32;
 use std::cmp::{min};
 use std::sync::Arc;
 use std::io::ErrorKind::Interrupted;
+use std::time::Duration;
 
 use rand::{thread_rng, Rng};
 use rotor::void::{unreachable, Void};
-use time::{SteadyTime, Duration};
 use dns_parser::{Packet, QueryType, QueryClass, RRData, Builder};
-use rotor::{Machine, EventSet, Scope, Response};
+use rotor::{Machine, EventSet, Scope, Response, Time};
 
 use {Fsm, Request, Query, Answer, CacheEntry, DnsMachine, Id, QueryError};
 use {TimeEntry, MxRecord, SrvRecord};
@@ -52,10 +52,8 @@ impl Request {
 }
 
 impl DnsMachine {
-    fn refresh_timeouts<C>(&mut self, scope: &mut Scope<C>) {
-        self.timeout.take().map(|x| scope.clear_timeout(x));
-
-        let now = SteadyTime::now();
+    fn refresh_timeouts<C>(&mut self, scope: &mut Scope<C>) -> Option<Time> {
+        let now = scope.now();
         while self.timeouts.peek().map(|x| x.0 < now).unwrap_or(false) {
             let id = self.timeouts.pop().unwrap().1;
             if let Some(mut req) = self.running.remove(&id) {
@@ -65,7 +63,8 @@ impl DnsMachine {
                 if req.attempts >= self.config.attempts {
                     let bad_cache = Arc::new(CacheEntry {
                         value: Answer::ServerUnavailable,
-                        expire: SteadyTime::now(),
+                        // TODO(tailhook) should it expire later?
+                        expire: scope.now(),
                     });
                     for (arc, notifier) in req.notifiers.into_iter() {
                         arc.lock().as_mut()
@@ -78,7 +77,7 @@ impl DnsMachine {
                     req.nameserver_index = (req.nameserver_index + 1)
                                            % self.config.nameservers.len();
                     req.server = self.config.nameservers[req.nameserver_index];
-                    req.deadline = SteadyTime::now() + self.config.timeout;
+                    req.deadline = scope.now() + self.config.timeout;
 
                     // There are two kind of errors:
                     // 1. Truncated packet, should never happen because we
@@ -94,11 +93,9 @@ impl DnsMachine {
                 }
             }
         }
-
-        self.timeout = self.timeouts.peek().map(
-            |x| scope.timeout_ms(x.millis()).unwrap());
+        return self.timeouts.peek().map(|x| x.0)
     }
-    fn recv_messages(&mut self) {
+    fn recv_messages<C>(&mut self, scope: &mut Scope<C>) {
         loop {
             let mut buf = [0u8; 4096];
             let (bytes, addr) = match self.sock.recv_from(&mut buf) {
@@ -190,7 +187,7 @@ impl DnsMachine {
             };
             let entry = CacheEntry {
                 value: result,
-                expire: SteadyTime::now() + Duration::seconds(ttl.into()),
+                expire: scope.now() + Duration::new(ttl.into(), 0),
             };
             let cache = Arc::new(entry);
             for (result, notifier) in req.notifiers {
@@ -234,6 +231,16 @@ impl DnsMachine {
     }
 }
 
+fn deadline_opt<X, Y>(resp: Response<X, Y>, deadline: Option<Time>)
+    -> Response<X, Y>
+{
+    println!("Deadline {:?}", deadline);
+    match deadline {
+        Some(x) => resp.deadline(x),
+        None => resp,
+    }
+}
+
 impl<C> Machine for Fsm<C> {
     type Seed = Void; // Actually void
     type Context = C;
@@ -243,12 +250,12 @@ impl<C> Machine for Fsm<C> {
     fn ready(self, _events: EventSet, scope: &mut Scope<Self::Context>)
         -> Response<Self, Self::Seed>
     {
-        {
+        let deadline = {
             let mut res = self.0.lock().unwrap();
-            res.recv_messages();
-            res.refresh_timeouts(scope);
-        }
-        Response::ok(self)
+            res.recv_messages(scope);
+            res.refresh_timeouts(scope)
+        };
+        deadline_opt(Response::ok(self), deadline)
     }
     fn spawned(self, _scope: &mut Scope<Self::Context>)
         -> Response<Self, Self::Seed>
@@ -256,13 +263,13 @@ impl<C> Machine for Fsm<C> {
     fn timeout(self, scope: &mut Scope<Self::Context>)
         -> Response<Self, Self::Seed>
     {
-        self.0.lock().unwrap().refresh_timeouts(scope);
-        Response::ok(self)
+        let deadline = self.0.lock().unwrap().refresh_timeouts(scope);
+        deadline_opt(Response::ok(self), deadline)
     }
     fn wakeup(self, scope: &mut Scope<Self::Context>)
         -> Response<Self, Self::Seed>
     {
-        self.0.lock().unwrap().refresh_timeouts(scope);
-        Response::ok(self)
+        let deadline = self.0.lock().unwrap().refresh_timeouts(scope);
+        deadline_opt(Response::ok(self), deadline)
     }
 }

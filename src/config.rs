@@ -3,8 +3,8 @@ use std::io::Read;
 use std::fs::File;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::time::Duration;
 
-use time::Duration;
 use ip::SocketAddrExt;
 use resolv_conf;
 
@@ -44,7 +44,7 @@ impl Config {
             nameservers: cfg.nameservers.iter()
                 .map(|ns| <SocketAddr as SocketAddrExt>::new(*ns, 53))
                 .collect(),
-            timeout: Duration::seconds(cfg.timeout.into()),
+            timeout: Duration::new(cfg.timeout.into(), 0),
             attempts: cfg.attempts.into(),
         })
     }

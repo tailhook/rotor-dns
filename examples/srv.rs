@@ -2,7 +2,6 @@
 extern crate rotor_dns;
 extern crate rotor_tools;
 
-use std::error::Error;
 use std::process::exit;
 
 use rotor::void::{Void, unreachable};

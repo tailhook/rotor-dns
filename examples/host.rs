@@ -2,11 +2,10 @@
 extern crate rotor_dns;
 extern crate rotor_tools;
 extern crate argparse;
-extern crate time;
 
 use std::process::exit;
+use std::time::Duration;
 
-use time::Duration;
 use rotor::void::{Void, unreachable};
 use argparse::{ArgumentParser, Store, List, ParseOption};
 use rotor::{Machine, EventSet, Scope, Response};
@@ -73,7 +72,7 @@ fn main() {
         cfg.nameservers = servers;
     }
     attempts.map(|x| cfg.attempts = x);
-    timeout.map(|x| cfg.timeout = Duration::milliseconds(x));
+    timeout.map(|x| cfg.timeout = Duration::from_millis(x));
     let resolver = loop_creator.add_and_fetch(Composed::Dns, |scope| {
         rotor_dns::create_resolver(scope, cfg)
     }).unwrap();

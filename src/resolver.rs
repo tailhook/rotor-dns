@@ -1,7 +1,6 @@
 use std::io;
 use std::sync::{Arc, Mutex};
 
-use time::{SteadyTime};
 use rotor::GenericScope;
 
 use {Query, Resolver, CacheEntry, Request, TimeEntry};
@@ -35,7 +34,7 @@ impl Resolver {
     {
         let ref mut res = *self.0.lock().unwrap();
         if let Some(cache) =  res.cache.get(&query).map(|x| x.clone()) {
-            if SteadyTime::now() > cache.expire {
+            if scope.now() > cache.expire {
                 res.cache.remove(&query);
             } else {
                 // TODO(tailhook) should we trade off possible bugs for
@@ -49,7 +48,7 @@ impl Resolver {
         let id = try!(res.send_request(&query, server));
 
         let result = Arc::new(Mutex::new(None));
-        let deadline = SteadyTime::now() + res.config.timeout;
+        let deadline = scope.now() + res.config.timeout;
         res.running.insert(id, Request {
             id: id,
             query: query,
