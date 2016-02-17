@@ -1,13 +1,10 @@
 #[macro_use] extern crate rotor;
 extern crate rotor_dns;
 extern crate rotor_tools;
-extern crate void;
-extern crate time;
 
-use std::error::Error;
 use std::process::exit;
 
-use void::{Void, unreachable};
+use rotor::void::{Void, unreachable};
 use rotor::{Machine, EventSet, Scope, Response};
 use rotor_dns::{CacheEntry, Query, Answer};
 use rotor_tools::loop_ext::{LoopExt};
@@ -24,7 +21,7 @@ impl Machine for Shutter {
     type Seed = Void; // Actually void
     type Context = Context;
     fn create(seed: Self::Seed, _scope: &mut Scope<Self::Context>)
-        -> Result<Self, Box<Error>>
+        -> Response<Self, Void>
     { unreachable(seed); }
     fn ready(self, _events: EventSet, _scope: &mut Scope<Self::Context>)
         -> Response<Self, Self::Seed>
@@ -56,7 +53,7 @@ fn main() {
     loop_inst.add_machine_with(|scope| {
         query = Some(resolver.query::<Scope<Context>>(
             Query::LookupMx(host), scope).unwrap());
-        Ok(Composed::Shut(Shutter))
+        Response::ok(Composed::Shut(Shutter))
     }).unwrap();
     loop_inst.run().unwrap();
     let qb = query.unwrap();

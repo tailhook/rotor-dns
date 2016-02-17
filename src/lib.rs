@@ -2,7 +2,6 @@ extern crate ip;
 extern crate rotor;
 extern crate time;
 extern crate rand;
-extern crate void;
 extern crate dns_parser;
 extern crate resolv_conf;
 #[macro_use] extern crate quick_error;
@@ -12,13 +11,12 @@ mod fsm;
 mod resolver;
 mod time_util;
 
-use std::io;
 use std::marker::PhantomData;
 use std::collections::{HashMap, BinaryHeap};
 use std::sync::{Arc, Mutex};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-use rotor::{EarlyScope, PollOpt, EventSet, Notifier, Timeout};
+use rotor::{EarlyScope, PollOpt, EventSet, Notifier, Timeout, Response, Void};
 use rotor::mio::udp::UdpSocket;
 
 pub use config::Config;
@@ -96,7 +94,7 @@ pub struct Fsm<C>(Arc<Mutex<DnsMachine>>, PhantomData<*const C>);
 pub struct Resolver(Arc<Mutex<DnsMachine>>);
 
 pub fn create_resolver<C>(scope: &mut EarlyScope, config: Config)
-    -> Result<(Fsm<C>, Resolver), io::Error>
+    -> Response<(Fsm<C>, Resolver), Void>
 {
     let machine = DnsMachine {
         config: config,
@@ -104,14 +102,21 @@ pub fn create_resolver<C>(scope: &mut EarlyScope, config: Config)
         // TODO(tailhook) implement duplicate checking
         // queued: HashMap::new(),
         cache: HashMap::new(),
-        sock: try!(UdpSocket::bound(&SocketAddr::V4(
-            SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)))),
+        sock: match UdpSocket::bound(&SocketAddr::V4(
+            SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0))) {
+            Ok(sock) => sock,
+            Err(e) => return Response::error(Box::new(e)),
+        },
         timeouts: BinaryHeap::new(),
         timeout: None,
         notifier: scope.notifier(),
     };
-    try!(scope.register(&machine.sock,
-        EventSet::readable(), PollOpt::level()));
+    match scope.register(&machine.sock,
+        EventSet::readable(), PollOpt::level())
+    {
+        Ok(()) => {}
+        Err(e) => return Response::error(Box::new(e)),
+    }
     let arc = Arc::new(Mutex::new(machine));
-    Ok((Fsm(arc.clone(), PhantomData), Resolver(arc.clone())))
+    Response::ok((Fsm(arc.clone(), PhantomData), Resolver(arc.clone())))
 }

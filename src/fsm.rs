@@ -2,10 +2,9 @@ use std::i32;
 use std::cmp::{min};
 use std::sync::Arc;
 use std::io::ErrorKind::Interrupted;
-use std::error::Error;
 
 use rand::{thread_rng, Rng};
-use void::{unreachable, Void};
+use rotor::void::{unreachable, Void};
 use time::{SteadyTime, Duration};
 use dns_parser::{Packet, QueryType, QueryClass, RRData, Builder};
 use rotor::{Machine, EventSet, Scope, Response};
@@ -239,7 +238,7 @@ impl<C> Machine for Fsm<C> {
     type Seed = Void; // Actually void
     type Context = C;
     fn create(seed: Self::Seed, _scope: &mut Scope<Self::Context>)
-        -> Result<Self, Box<Error>>
+        -> Response<Self, Void>
     { unreachable(seed); }
     fn ready(self, _events: EventSet, scope: &mut Scope<Self::Context>)
         -> Response<Self, Self::Seed>
