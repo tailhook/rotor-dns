@@ -13,7 +13,7 @@ authors = ["paul@colomiets.name"]
 
 [dependencies]
 rand = "0.3.13"
-rotor = {git="git://github.com/tailhook/rotor", rev="08946ce"}
+rotor = {git="git://github.com/tailhook/rotor", rev="d001aa3"}
 ip = "1.0.0"
 quick-error = "0.2.2"
 dns-parser = "0.3.0"
@@ -21,7 +21,7 @@ resolv-conf = "0.3.0"
 
 [dev-dependencies]
 argparse = "0.2.1"
-rotor-tools = {git="git://github.com/tailhook/rotor-tools", rev="9710c96"}
+rotor-tools = {git="git://github.com/tailhook/rotor-tools", rev="f32fb8c"}
 
 [lib]
 name = "rotor_dns"
