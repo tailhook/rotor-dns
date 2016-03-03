@@ -5,7 +5,6 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use ip::SocketAddrExt;
 use resolv_conf;
 
 
@@ -42,7 +41,7 @@ impl Config {
         let cfg = try!(resolv_conf::Config::parse(&buf));
         Ok(Config {
             nameservers: cfg.nameservers.iter()
-                .map(|ns| <SocketAddr as SocketAddrExt>::new(*ns, 53))
+                .map(|ns| SocketAddr::new(*ns, 53))
                 .collect(),
             timeout: Duration::new(cfg.timeout.into(), 0),
             attempts: cfg.attempts.into(),
