@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Answer","A generic DNS answer"],["Query","Human friendly query types"],["QueryError","Error when creating a query"],["QueryType","The QTYPE value according to RFC 1035"]],"fn":[["create_resolver",""]],"struct":[["CacheEntry",""],["Config",""],["Fsm",""],["MxRecord","Single MX record"],["Resolver",""],["SrvRecord","Single SRV record"]]});
